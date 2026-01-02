@@ -11,16 +11,34 @@ class GithubService:
             "Authorization": f"Bearer {os.getenv('GITHUB_TOKEN')}",
             "Accept": "application/vnd.github.v3+json",
         })
+    
+    def _get_base_url(self) -> str:
+        base_url = os.getenv('GITHUB_API_URL', 'https://api.github.com')
+        return base_url.rstrip('/')
 
     def _get(self, path: str, headers: dict = None, return_text: bool = False):
         request_headers = headers if headers else {}
-        response = self.session.get(f"{os.getenv('GITHUB_API_URL')}{path}", headers=request_headers)
+        url = f"{self._get_base_url()}{path}"
+        response = self.session.get(url, headers=request_headers)
         response.raise_for_status()
         return response.text if return_text else response.json()
 
     def _post(self, path: str, json: dict):
-        response = self.session.post(f"{os.getenv('GITHUB_API_URL')}{path}", json=json)
-        response.raise_for_status()
+        url = f"{self._get_base_url()}{path}"
+        response = self.session.post(url, json=json)
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            error_msg = f"HTTP {response.status_code} Error: {e}\nURL: {url}"
+            try:
+                error_body = response.json()
+                if "message" in error_body:
+                    error_msg += f"\nGitHub API message: {error_body['message']}"
+                if "errors" in error_body:
+                    error_msg += f"\nGitHub API errors: {error_body['errors']}"
+            except:
+                error_msg += f"\nResponse body: {response.text[:500]}"
+            raise requests.exceptions.HTTPError(error_msg, response=response)
         return response.json()
 
     def get_pull_request(self, owner: str, repo: str, pull_number: int):
@@ -35,3 +53,6 @@ class GithubService:
             headers={"Accept": "application/vnd.github.v3.diff"},
             return_text=True
         )
+
+    def create_issue_comment(self, owner: str, repo: str, pull_number: int, comment: str):
+        return self._post(f"/repos/{owner}/{repo}/issues/{pull_number}/comments", json={"body": comment})

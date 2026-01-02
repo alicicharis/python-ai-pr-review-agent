@@ -1,13 +1,12 @@
 from dotenv import load_dotenv
-from src.github import GithubService
+from src.workflow import Workflow
 
 load_dotenv()
 
 def main():
-    github = GithubService()
-    res = github.get_pull_request("alicicharis","notes-mcp-server", 1)
-
-    print(f"Res: {res}")
+    workflow = Workflow()
+    result = workflow.run()
+    print(f"Result: {result}")
 
 if __name__ == "__main__":
     main()
